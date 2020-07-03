@@ -1,5 +1,4 @@
 ﻿using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -7,94 +6,15 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpStick
+namespace SharpStick.Win32
 {
-    class StructuredStorage
+    class ole32
     {
-        public List<string> readFile(string path)
-        {
-            var data = new List<string>();
-            var isOLE = StructuredStorage.StgIsStorageFile(path);
-            if (isOLE == 0)
-            {
-                //open the storage 
-                IStorage Is;
-                int result = StgOpenStorage(path, null, STGM.READ | STGM.SHARE_DENY_WRITE, IntPtr.Zero, 0, out Is);
-                //set up to fetch one item on each call to next
-                IEnumSTATSTG SSenum;
-                Is.EnumElements(0, IntPtr.Zero, 0, out SSenum);
-                var SSstruct = new System.Runtime.InteropServices.ComTypes.STATSTG[1];
-
-                //do the loop until not more items
-                uint NumReturned;
-                do
-                {
-                    SSenum.Next(1, SSstruct, out NumReturned);
-                    if (NumReturned != 0)
-                    {
-                        if(SSstruct[0].type == 1)
-                        {
-                            OpenSubStorage(Is, SSstruct[0].pwcsName, data);
-                        }
-
-                    }
-                } while (NumReturned > 0);
-            }
-            return data;
-        }
-
-        //No problem cant be made worse with recursion! 
-        private List<string> OpenSubStorage(IStorage Is, string pwcsName, List<string> data)
-        {
-            IStorage ppstg;
-            Is.OpenStorage(pwcsName, null, (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE), IntPtr.Zero, 0, out ppstg);
-
-            //set up to fetch one item on each call to next
-            IEnumSTATSTG SSenum;
-            ppstg.EnumElements(0, IntPtr.Zero, 0, out SSenum);
-            var SSstruct = new System.Runtime.InteropServices.ComTypes.STATSTG[1];
-
-            //do the loop until not more items
-            uint NumReturned;
-            do
-            {
-                SSenum.Next(1, SSstruct, out NumReturned);
-                if (NumReturned != 0)
-                {
-                    if(SSstruct[0].type == 1)
-                    {
-                        OpenSubStorage(ppstg, SSstruct[0].pwcsName, data);
-                    }
-                    else if (SSstruct[0].type == 2 && SSstruct[0].pwcsName == "3")
-                    {
-                        data.Add(readStream(ref ppstg, SSstruct[0].pwcsName));
-                    }
-                }
-            } while (NumReturned > 0);
-
-            return data;
-        } 
-
-        private string readStream(ref IStorage Is, string pwcsName)
-        {
-            IStream stream;
-            byte[] buf = new byte[1000];
-            IntPtr readBuffer = Marshal.AllocCoTaskMem(Marshal.SizeOf(typeof(int)));
-            
-            Is.OpenStream(pwcsName, IntPtr.Zero, (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE), 0, out stream);
-            stream.Read(buf, 1000, readBuffer);
-            int intValue = Marshal.ReadInt32(readBuffer);
-            Marshal.FreeCoTaskMem(readBuffer);
-
-            //only print the number of bytes we actually read. Lets just assume we never read more than 1000
-            return System.Text.Encoding.Unicode.GetString(buf.Take(intValue-2).ToArray());
-        }
-        //Check if a file is an OLE - 0 if it is, 1 if it isn't, or error
         [DllImport("ole32.dll")]
         public static extern int StgIsStorageFile([MarshalAs(UnmanagedType.LPWStr)] string pwcsName);
 
         [DllImport("ole32.dll")]
-        public static extern int StgOpenStorage([MarshalAs(UnmanagedType.LPWStr)]string pwcsName, 
+        public static extern int StgOpenStorage([MarshalAs(UnmanagedType.LPWStr)]string pwcsName,
             IStorage pstgPriority, STGM grfMode, IntPtr snbExclude, uint reserved, out IStorage ppstgOpen);
 
         [Flags]
@@ -231,7 +151,5 @@ namespace SharpStick
             [return: MarshalAs(UnmanagedType.Interface)]
             IEnumSTATSTG Clone();
         }
-
-
     }
 }
